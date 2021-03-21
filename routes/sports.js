@@ -124,9 +124,12 @@ async function addParticipant(date, sport, userId){
 
     const result = await Activity.updateOne(filter, update);
     //res.status(status).json(obj)
-    console.log('Modified: ' + result.nModified);
+    //console.log('Modified: ' + result.nModified);
 
-    return result.nModified;
+    return {
+        error: '',
+        modified: result.nModified
+    };
     //res.n; // Number of documents matched
     //res.nModified; // Number of documents modified  
 
@@ -147,7 +150,10 @@ async function removeParticipant(date, title, userId){
     const result = await Activity.updateOne(filter, update);
     console.log('Modified: ' + result.nModified);
 
-    return result.nModified;
+    return {
+        error: '',
+        modified: result.nModified
+    };
 }
 
 module.exports = router;

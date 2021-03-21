@@ -1,21 +1,19 @@
 const express = require('express');
+const router = express.Router();
 const User = require('../models/user');
+const Token = require('../models/token');
 const crypto = require('crypto');
 const { validationResult } = require('express-validator');
 const { registerValidators } = require('../utils/validators');
-const sgMail = require('@sendgrid/mail');
+const mailing = require('@sendgrid/mail');
 const bcrypt = require('bcryptjs');
 const config = require('../keys/config');
-const regMessage = require('../mailing/registration');
-const resetEmail = require('../mailing/reset');
+const registerMailing = require('../mailing/registration');
+const resetMailing = require('../mailing/reset');
+const path = require('path');
 const { addListener } = require('../models/user');
-const router = express.Router();
-// const transporter = nodemailer.createTransport(sendgrid({
-//     auth: {
-//         api_key: config.SENDGRID_API
-//     }
-// }));
-sgMail.setApiKey(config.SENDGRID_API);
+
+mailing.setApiKey(config.SENDGRID_API);
 
 router.get('/login', async (req, res) => {
     res.render('auth/login', {
@@ -28,6 +26,9 @@ router.get('/login', async (req, res) => {
 
 router.get('/logout', async (req, res) => {
     req.session.destroy(() => {
+        if(req.body.mobile){
+            return res.status(200);
+        }
         res.redirect('/auth/login#login');
     });
 });
@@ -41,7 +42,83 @@ router.get('/reset', async (req, res) => {
 
 router.get('/verify/:token', async (req, res) => {
     if(!req.params.token) {
-        return res.redirect('/auth/login');
+        return res.status(400).json('{"mesage": "Request does not contain token"}');
+    }
+
+    try {
+        let token = await Token.findOne({
+            value: req.params.token,
+            expiration: { $gt: Date.now() }
+        });
+        if(token) {
+            await Token.deleteOne({ value: req.params.token });
+            return res.sendFile(path.resolve('views/auth/success.html')); 
+        }
+
+        token = await Token.findOne({
+            value: req.params.token,
+            expiration: { $lte: Date.now() }
+        });
+        if(token) {
+            res.status(401).json(`{"message": "You token was expired. You will receive new token on your mail: ${token.email} shortly"}`); 
+            
+            crypto.randomBytes(16, async (err, buffer) => {
+                if(err) {
+                    console.log(err);
+                    return;
+                }
+                const newtoken = buffer.toString('hex');
+    
+                await new Token({
+                    email: token.email,
+                    value: newtoken, 
+                    expiration: Date.now() + 86400 * 1000
+                }).save();
+
+                const u = await User.findOne({
+                    email: token.email
+                });
+    
+                await mailing
+                    .send(registerMailing(u.email.toString(), u.firstname.toString(), token))
+                    .then(() => {
+                        console.log('Email sent');
+                    })
+                .catch((error) => {
+                    console.error(error);
+                });
+            });
+
+            return await Token.deleteOne({ value: req.params.token });
+        }
+    }
+    catch (e) {
+        console.log(e);
+    } 
+
+    try {
+        const user = await User.findOne({
+            resetToken: req.params.token,
+            tokenExpiration: { $gt: Date.now() }
+        });
+        if(!user) {
+            return res.status(400).json('{"message": "Token was not found or expired"}');
+        }
+        res.render('auth/verify', {
+            title: 'Password reset',
+            error: req.flash('error'),
+            userId: user._id.toString(),
+            token: req.params.token
+        }); 
+    }
+    catch (e) {
+        console.log(e);
+    }   
+});
+
+router.get('/report/:token', async (req, res) => {
+    if(!req.params.token) {
+        return res.status(400).statusMessage('Request does not contain token');
     }
 
     try {
@@ -50,8 +127,7 @@ router.get('/verify/:token', async (req, res) => {
             tokenExpiration: { $gt: Date.now() }
         });
         if(!user) {
-            req.flash();
-            return res.redirect('/auth/login');
+            return res.status(400).statusMessage('Request does not contain token');
         }
         res.render('auth/verify', {
             title: 'Password reset',
@@ -67,10 +143,18 @@ router.get('/verify/:token', async (req, res) => {
 
 router.post('/login', async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, mobile } = req.body;
         const user = await User.findOne({ email });
         
         if(user) {
+
+            const token = await Token.findOne({
+                email//it means user is not verified
+            });
+            if(token) {
+                return res.status(401).json('{"message": "Account is not verified"}');
+            }
+
             if(await bcrypt.compare(password, user.password)){
                 req.session.user = user;
                 req.session.isAuthenticated = true;
@@ -78,16 +162,24 @@ router.post('/login', async (req, res) => {
                     if(err) {
                         throw err;
                     }
+                    if(mobile){
+                        return res.status(201);
+                    }
                     res.redirect('/');
                 });
             }
             else {
+                if(mobile){
+                    return res.status(401).json('{"message": "Incorrect password"}');
+                }
                 req.flash('loginError', 'Incorrect password');
                 res.redirect('/auth/login#login');
             }
-            
         }
         else {
+            if(mobile){
+                return res.status(401).json('{"message": "No account exists with this email"}');
+            }
             req.flash('loginError', 'No account exists with this email');
             res.redirect('/auth/login#login');
         }
@@ -100,47 +192,50 @@ router.post('/login', async (req, res) => {
 router.post('/register', async (req, res) => {
     try {
         const { email, password, firstname, lastname, personal_number } = req.body;
-        res.status(200).json(addUser(email, password, firstname, lastname, personal_number));
-        //removeUser(email);
-        // const user = await User.findOne({ email });
-        // const errors = validationResult(req);
-        // if(!errors.isEmpty()) {
-        //     req.flash('registerError', errors.array()[0].msg);
-        //     return res.status(422).redirect('/auth/login#register');
-        // }
+        const addResult = await addUser(email, password, firstname, lastname, personal_number);
 
-        // if(user) {
-        //     //send user exists response
-        //     // req.flash('error', 'User with this email already exists');
-        //     // res.redirect('/auth/login#login');//user exists and we redirect for log in
-        // }
-        // else {
-            //show ok
+        if(addResult.modified == 0){
+            return res.status(201).json(JSON.stringify(addResult));
+        }
+        
+        crypto.randomBytes(16, async (err, buffer) => {
+            if(err) {
+                console.log(err);
+                return;
+            }
+            const token = buffer.toString('hex');
 
-        // res.redirect('/auth/login#login');
-        // await sgMail
-        //     .send(regMessage(email, firstname))
-        //     .then(() => {
-        //         console.log('Email sent');
-        //     })
-        //     .catch((error) => {
-        //         console.error(error);
-        //     });
-        //}
+            await new Token({
+                email,
+                value: token, 
+                expiration: Date.now() + 86400 * 1000
+            }).save();
+
+            await mailing
+                .send(registerMailing(email.toString(), firstname.toString(), token))
+                .then(() => {
+                    console.log('Email sent');
+                })
+            .catch((error) => {
+                console.error(error);
+            });
+            
+            res.status(201).json('{"message": "Confirmation email has been sent"}');
+        });
     }
     catch (e) {
         console.log(e);
     } 
 });
 
-router.post('/reset', async (req, res) => {
+router.post('/password-reset', async (req, res) => {
     try {
         const user = await User.findOne({ email: req.body.email });
         if(!user) {
             req.flash('error', 'There is no user registered with this email');
             return res.redirect('/auth/reset');
         }
-        crypto.randomBytes(32, async (err, buffer) => {
+        crypto.randomBytes(16, async (err, buffer) => {
             if(err) {
                 req.flash('error', 'Something went wrong, try again one more time');
                 return res.redirect('/auth/reset');
@@ -149,8 +244,9 @@ router.post('/reset', async (req, res) => {
             user.resetToken = token;
             user.tokenExpiration = Date.now() + 86400 * 1000;
             await user.save();
-            await sgMail.send(resetEmail(user.email, user.name, token, req.headers['user-agent']));
-            return res.redirect('/auth/login');
+            await mailing.send(resetMailing(user.email, user.name, token, req.headers['user-agent']));
+            
+            res.status(201).json('{"message": "Confirmation email has been sent"}');
         });
     }
     catch (e) {
@@ -159,40 +255,41 @@ router.post('/reset', async (req, res) => {
 });
 
 router.post('/password-update', async (req, res) => {
-     try {
-        const user = await User.findOne({
-            _id: req.body.userId,
-            resetToken: req.body.token,
-            tokenExpiration: { $gt: Date.now() } 
-        });   
+    try {
+       const user = await User.findOne({
+           _id: req.body.userId,
+           resetToken: req.body.token,
+           tokenExpiration: { $gt: Date.now() } 
+       });   
 
-        if(!user) {
-            req.flash('loginError', 'Token expired');
-            return res.redirect('/auth/login');
-        }
+       if(!user) {
+           req.flash('loginError', 'Token expired');
+           return res.redirect('/auth/login');
+       }
 
-        user.password = await bcrypt.hash(req.body.password, (Math.floor(Math.random() * 3) + 10));
-        user.resetToken = undefined;
-        user.tokenExpiration = undefined;
-        await user.save();
-        res.redirect('/auth/login');
-     }
-     catch (e) {
-         console.log(e);
-     }
+       user.password = await bcrypt.hash(req.body.password, (Math.floor(Math.random() * 3) + 10));
+       user.resetToken = undefined;
+       user.tokenExpiration = undefined;
+       await user.save();
+       res.redirect('/auth/login');
+    }
+    catch (e) {
+        console.log(e);
+    }
 });
 
 async function addUser(email, pass, firstname, lastname, personal_number){
 
-    const result = await User.findOne({ email: 'asd' });
-    var error;
+    const result = await User.findOne({ email });
+
     if(result != null){
         return {
-            error: 'Such email already exists in database, proceed to login or reset.'
+            error: 'Such email already exists in database, proceed to login or reset.',
+            modified: 0
         };
     }
 
-    const hashed = await bcrypt.hash(password, Math.floor(Math.random() * 3) + 10);
+    const hashed = await bcrypt.hash(pass, Math.floor(Math.random() * 3) + 10);
     await new User({
         email, 
         password: hashed, 
@@ -201,29 +298,68 @@ async function addUser(email, pass, firstname, lastname, personal_number){
         personal_number
     }).save();
 
-    return result.nModified;
+    return {
+        error: '',
+        modified: 1
+    };
 }
 
 async function removeUser(email){
 
-    const result = await User.findOne({ email });
-    var error;
-    if(result == null){
+    const user = await User.findOne({ email });
+    if(user == null){
         return {
-            error: 'No user exists with this email.'
+            error: 'No user exists with this email.',
+            modified: 0
         };
     }
 
     await User.deleteOne({ email });
 
-    return result.nModified;
+    return {
+        error: '',
+        modified: 1
+    };
+}
+
+async function changePassword(email, oldpass, newpass){
+    if(oldpass === newpass){
+        return {
+            error: 'Passwords cannot be same.',
+            modified: 0
+        };
+    }
+
+    const user = await User.findOne({ email });
+    if(user == null){
+        return {
+            error: 'No user exists with this email.',
+            modified: 0
+        };
+    }
+    else if(!await bcrypt.compare(password, user.password)){
+        return {
+            error: 'Passwords do not match.',
+            modified: 0
+        };
+    }
+
+    user.password = await bcrypt.hash(newpass, (Math.floor(Math.random() * 3) + 10));
+    user.resetToken = undefined;
+    user.tokenExpiration = undefined;
+    await user.save();
+
+    return {
+        error: '',
+        modified: 1
+    };
 }
 
 
 module.exports = router;
 
-// const sgMail = require('@sendgrid/mail')
-// sgMail.setApiKey(process.env.SENDGRID_API_KEY)
+// const mailing = require('@sendgrid/mail')
+// mailing.setApiKey(process.env.SENDGRID_API_KEY)
 // const msg = {
 //   to: 'test@example.com', // Change to your recipient
 //   from: 'test@example.com', // Change to your verified sender
@@ -231,7 +367,7 @@ module.exports = router;
 //   text: 'and easy to do anywhere, even with Node.js',
 //   html: '<strong>and easy to do anywhere, even with Node.js</strong>',
 // }
-// sgMail
+// mailing
 //   .send(msg)
 //   .then(() => {
 //     console.log('Email sent')

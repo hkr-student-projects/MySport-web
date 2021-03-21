@@ -172,20 +172,23 @@ function testPost(port){
     const url2 = `http://localhost:${port}/auth/register`;
 
     const user = {
-        "firstname": "Michael",
-        "lastname": "Jackson",
-        "email": "hopspops@mail.ru",
-        "password": "12345",
-        "personal_number": "1234-1234"
+        "firstname": "Deniel",
+        "lastname": "Alekseev",
+        "email": "daniel.neo.eu@icloud.com",
+        "password": "123",
+        "personal_number": "19980516-1234"
     };
       
     request.post({
-        url: url1,
-        body: obj,
+        url: url2,
+        body: user,
         json: true
-    }, function(error, response, body){
-        console.log('Error: ' + error);
-        console.log('Response: ' + response);
+    }, function(error, res, body){
+        // if (!error) {        
+        //     console.log(response.json(JSON.parse(body)));
+        // }
+        console.log(res.statusCode);
+        console.log(JSON.parse(body));
     });
  
 }
