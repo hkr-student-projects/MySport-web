@@ -1,0 +1,16 @@
+[{
+    "title": "VueJS",
+    "price": "123",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/95/Vue.js_Logo_2.svg/1280px-Vue.js_Logo_2.svg.png",
+    "id": "b9ef5790-8b80-488a-89a4-b31ae4caec4d"
+}, {
+    "title": " JavaScript",
+    "price": "120",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/9/99/Unofficial_JavaScript_logo_2.svg",
+    "id": "b4159c46-b94b-4561-8312-4a641ff03f9f"
+}, {
+    "title": "asd",
+    "price": "12",
+    "image": "asd",
+    "id": "62c8cf8f-51ac-49a0-851b-2ef3672077eb"
+}]
