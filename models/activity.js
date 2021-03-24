@@ -16,14 +16,23 @@ const activity = new Schema({
         type: Date,
         require: true
     },
-    location: {
-        type: {
-          type: String,
-          default: 'Point',
-        },
-        coordinates: [Number],
-        required: false // [22.2475, 14.2547]  [longitude, latitude]
+    start_millis: {
+        type: Number,
+        require: true
     },
+    end_millis: {
+        type: Number,
+        require: true
+    },
+    // location: {
+    //     type: {
+    //       type: String,
+    //       default: 'Point',
+    //     },
+    //     coordinates: [Number],
+    //     required: false // [22.2475, 14.2547]  [longitude, latitude]
+    // },
+    location: String,
     participants: {
         list: [
             {

@@ -8,8 +8,8 @@ const router = express.Router();
 
 router.post('/add', async (req, res) => {
     try {
-        const { title, start_date, end_date, location } = req.body;
-        res.status(200).json(addSportActivity(title, new Date(start_date), new Date(end_date), location));
+        const { title, start_date, start_millis, end_date, end_millis, location } = req.body;
+        res.status(200).json(addSportActivity(title, new Date(start_date), start_millis, new Date(end_date), end_millis, location));
         
         //addParticipant();
         //return;
@@ -42,7 +42,7 @@ router.post('/add-participant', async (req, res) => {
     } 
 });
 
-async function addSportActivity(title, start_date, end_date, location){
+async function addSportActivity(title, start_date, start_millis, end_date, end_millis, location){
 
     // var filter = { 
     //     "$and": [
@@ -66,6 +66,8 @@ async function addSportActivity(title, start_date, end_date, location){
         title, 
         start_date, 
         end_date,
+        start_millis,
+        end_millis,
         location
     }).save();
 

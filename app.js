@@ -113,7 +113,7 @@ async function start(){
         app.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}..`);
         });
-        testPost(PORT);
+        //testPost(PORT);
     }
     catch (e) {
         console.log(e);
