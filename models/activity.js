@@ -36,13 +36,20 @@ const activity = new Schema({
     participants: {
         list: [
             {
-                userId: {
-                    type: Schema.Types.ObjectId,
-                    ref: 'User'
-                }
+                name: String
             }
         ]
     }
+    // participants: {
+    //     list: [
+    //         {
+    //             userId: {
+    //                 type: Schema.Types.ObjectId,
+    //                 ref: 'User'
+    //             }
+    //         }
+    //     ]
+    // }
 }, { timestamps: true });
 
 activity.methods.addParticipant = function(title, date, userId) {

@@ -30,12 +30,40 @@ router.post('/add', async (req, res) => {
 
 router.post('/add-participant', async (req, res) => {
     try {
-        const { date, title, userId } = req.body;
+        const { date, title, fullname } = req.body;
 
-        const msg = addParticipant(new Date(date), title, userId) == 1 ? 
-            `Participant with id: ${userId} has been registered on ${title} on ${date}.` :
+        const msg = addParticipant(new Date(date), title, fullname) == 1 ? 
+            `Participant: ${fullname} has been registered on ${title} on ${date}.` :
             `Participant was already registered on ${title} on ${date}.`;
-        res.status(200).json({ message: msg });
+        res.send(`{ "message": ${msg} }`);
+    }
+    catch (e) {
+        console.log(e);
+    } 
+});
+
+router.post('/get-day', async (req, res) => {
+    try {
+        const { date } = req.body;
+
+        await getSportDay(new Date(date)).then(v => {
+            res.send(v);
+        });
+    }
+    catch (e) {
+        console.log(e);
+    } 
+});
+
+
+router.post('/remove-participant', async (req, res) => {
+    try {
+        const { date, title, fullname } = req.body;
+
+        const msg = removeParticipant(new Date(date), title, fullname) == 1 ? 
+            `Participant: ${fullname} has been removed from ${title} on ${date}.` :
+            `Participant was not found on ${title} on ${date}.`;
+        res.send(`{ "message": ${msg} }`);
     }
     catch (e) {
         console.log(e);
@@ -48,7 +76,7 @@ async function addSportActivity(title, start_date, start_millis, end_date, end_m
     //     "$and": [
     //         { "$eq": [{ "$year": "$start_date" }, start_date.getFullYear() + 1] },
     //         { "$eq": [{ "$month": "$start_date" }, start_date.getMonth() + 1] },
-    //         { "$eq": [{ "$day": "$start_date" }, start_date.getDay()] },
+    //         { "$eq": [{ "$dayOfMonth": "$start_date" }, start_date.getDay()] },
     //         { 'title': title }
     //     ]
     // };
@@ -83,7 +111,7 @@ async function removeSportActivity(title, start_date, end_date, location){
         $and: [
             { "$expr": { "$eq": [{ "$year": "$start_date" }, start_date.getFullYear() + 1] } },
             { "$expr": { "$eq": [{ "$month": "$start_date" }, start_date.getMonth() + 1] } },
-            { "$expr": { "$eq": [{ "$day": "$start_date" }, start_date.getDay()] } },
+            { "$expr": { "$eq": [{ "$dayOfMonth": "$start_date" }, start_date.getDay()] } },
             { 'title': title }
           ]
     };
@@ -105,57 +133,55 @@ async function removeSportActivity(title, start_date, end_date, location){
     };
 }
 
-async function addParticipant(date, sport, userId){
-    // updateOne(
-    //     BasicDBObject.parse("{ _id: "+date.getDayOfMonth()+", " +
-    //             "\"activities._id\": \"" + sport + "\" }"),
-    //     BasicDBObject.parse("{ $push: {\"activities.$." + table + "\": " + id + "}}")
+async function addParticipant(date, sport, fullname){
     var filter = { 
         $and: [
             { "$expr": { "$eq": [{ "$year": "$start_date" }, date.getFullYear() + 1] } },
             { "$expr": { "$eq": [{ "$month": "$start_date" }, date.getMonth() + 1] } },
+            { "$expr": { "$eq": [{ "$dayOfMonth": "$start_date" }, date.getDay()] } },
             { 'title': sport },
-            { 'participants.list': { $nin: ObjectId(userId)} },
+            { 'participants.list': { $nin: fullname} },
           ]
     };
-    var update = { $push: { 'participants.list': ObjectId(userId) } };
-    // var callback = function(err, res) {
-    //     if (err) { throw err; }
-    //     console.log("1 document updated");
-    // };
+    var update = { $push: { 'participants.list': fullname } };
 
     const result = await Activity.updateOne(filter, update);
-    //res.status(status).json(obj)
-    //console.log('Modified: ' + result.nModified);
 
-    return {
-        error: '',
-        modified: result.nModified
-    };
-    //res.n; // Number of documents matched
-    //res.nModified; // Number of documents modified  
-
-    //console.log(Activity.find(filter).exec().then(r => console.log(r)));
+    return result.nModified;
 }
 
-async function removeParticipant(date, title, userId){
+async function removeParticipant(date, sport, fullname){
     var filter = { 
         $and: [
             { "$expr": { "$eq": [{ "$year": "$start_date" }, date.getFullYear() + 1] } },
             { "$expr": { "$eq": [{ "$month": "$start_date" }, date.getMonth() + 1] } },
-            { 'title': title },
-            { 'participants.list': { $in: ObjectId(userId)} },
+            { "$expr": { "$eq": [{ "$dayOfMonth": "$start_date" }, date.getDay()] } },
+            { 'title': sport },
+            { 'participants.list': { $in: fullname} },
         ]
     };
-    var update = { $pull: { 'participants.list': ObjectId(userId) } };
+    var update = { $pull: { 'participants.list': fullname } };
 
     const result = await Activity.updateOne(filter, update);
     console.log('Modified: ' + result.nModified);
 
-    return {
-        error: '',
-        modified: result.nModified
+    return result.nModified;
+}
+
+async function getSportDay(date){
+    var filter = { 
+        $and: [
+            { "$expr": { "$eq": [{ "$year": "$start_date" }, date.getFullYear()] } },
+            { "$expr": { "$eq": [{ "$month": "$start_date" }, date.getMonth() + 1] } },
+            { "$expr": { "$eq": [{ "$dayOfMonth": "$start_date" }, date.getUTCDate() + 1] } }
+          ]
     };
+    const result = await Activity.find(filter);
+    //console.log(result.toStr);
+
+    return JSON.stringify({
+        sports: result
+    });
 }
 
 module.exports = router;

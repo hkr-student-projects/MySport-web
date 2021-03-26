@@ -11,15 +11,8 @@ const mongoose = require('mongoose');
 const MongoStore = require('connect-mongodb-session')(session);
 
 const homeRoute = require('./routes/home');
-//const contactRoute = require('./routes/contact');
-//const cartRoute = require('./routes/cart');
-//const addRoute = require('./routes/add');
-//const coursesRoute = require('./routes/courses');
-//const ordersRoute = require('./routes/orders');
 const authRoute = require('./routes/auth');
 const sportsRoute = require('./routes/sports');
-// const varMiddleware = require('./middleware/variables');
-// const userMiddleware = require('./middleware/user');
 const errorMiddleware = require('./middleware/error');
 const config = require('./keys/config');
 
@@ -64,18 +57,11 @@ app.use(session({
 //app.use(flash());
 //app.use(helmet());
 app.use(compression());
-//app.use(varMiddleware);
-//app.use(userMiddleware);
 app.use(express.json());
 
 app.use('/auth', authRoute);
 app.use('/sports', sportsRoute);
-//app.use('/contact', contactRoute);
 app.use('/', homeRoute);
-//app.use('/add', addRoute);
-//app.use('/courses', coursesRoute);
-//app.use('/cart', cartRoute);
-//app.use('/orders', ordersRoute);
 app.use(errorMiddleware);
 
 const PORT = process.env.PORT || 3000;
@@ -93,27 +79,14 @@ async function start(){
             useUnifiedTopology: true 
         });
 
-        // if(!await User.findOne()){
-        //     // const user = new User({
-        //     //     email: 'hopspops@google.com',
-        //     //     name: 'M22',
-        //     //     cart: {
-        //     //         items: []
-        //     //     }
-        //     // });
-        //     await new User({
-        //         email: 'hopspops@google.com',
-        //         name: 'M22',
-        //         cart: {
-        //             items: []
-        //         }
-        //     }).save();
-        // }
 
         app.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}..`);
         });
         //testPost(PORT);
+        // require('bcryptjs').compare('123123', '$2a$12$pSjEfFjTD9saDZ1Bw36jxugKcwq93dnvJSopfRbtmWcFDhZvkJnVu').then(v => {
+        //     console.log(v);
+        // });
     }
     catch (e) {
         console.log(e);
@@ -170,6 +143,7 @@ function testPost(port){
 
     const url1 = `http://localhost:${port}/sports/add`;
     const url2 = `http://localhost:${port}/auth/register`;
+    const url3 = `http://localhost:${port}/sports/get-day`;
 
     const user = {
         "firstname": "Deniel",
@@ -178,17 +152,21 @@ function testPost(port){
         "password": "123",
         "personal_number": "19980516-1234"
     };
+
+    const day = {
+        "date": new Date(2021, 02, 26)
+    };
       
     request.post({
-        url: url2,
-        body: user,
+        url: url3,
+        body: day,
         json: true
     }, function(error, res, body){
         // if (!error) {        
         //     console.log(response.json(JSON.parse(body)));
         // }
         console.log(res.statusCode);
-        console.log(JSON.parse(body));
+        console.log(body);
     });
  
 }

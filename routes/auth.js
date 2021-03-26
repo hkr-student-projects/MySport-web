@@ -118,7 +118,7 @@ router.get('/verify/:token', async (req, res) => {
 
 router.get('/report/:token', async (req, res) => {
     if(!req.params.token) {
-        return res.status(400).statusMessage('Request does not contain token');
+        return res.statusMessage('"status": 400, "Request does not contain token"');
     }
 
     try {
@@ -127,7 +127,7 @@ router.get('/report/:token', async (req, res) => {
             tokenExpiration: { $gt: Date.now() }
         });
         if(!user) {
-            return res.status(400).statusMessage('Request does not contain token');
+            return res.statusMessage('"status": 400, "Request does not contain token"');
         }
         res.render('auth/verify', {
             title: 'Password reset',
@@ -147,12 +147,11 @@ router.post('/login', async (req, res) => {
         const user = await User.findOne({ email });
         
         if(user) {
-
             const token = await Token.findOne({
                 email//it means user is not verified
             });
-            if(token) {
-                return res.status(401).json('{"message": "Account is not verified"}');
+            if(mobile && token) {
+                return res.send('{"status": 401, "message": "Account is not verified"}');
             }
 
             if(await bcrypt.compare(password, user.password)){
@@ -163,14 +162,22 @@ router.post('/login', async (req, res) => {
                         throw err;
                     }
                     if(mobile){
-                        return res.status(201);
+                        return res.send(`
+                        {
+                            "status": 201, 
+                            "message": "Successful login", 
+                            "email": "${email}",
+                            "firstname": "${user.firstname}",
+                            "lastname": "${user.lastname}",
+                            "user_type": ${user.user_type}
+                        }`);
                     }
                     res.redirect('/');
                 });
             }
             else {
                 if(mobile){
-                    return res.status(401).json('{"message": "Incorrect password"}');
+                    return res.send('{ "status": 401, "message": "Incorrect password" }');
                 }
                 req.flash('loginError', 'Incorrect password');
                 res.redirect('/auth/login#login');
@@ -178,7 +185,7 @@ router.post('/login', async (req, res) => {
         }
         else {
             if(mobile){
-                return res.status(401).json('{"message": "No account exists with this email"}');
+                return res.send('{"status": 401, "message": "No account exists with this email"}');
             }
             req.flash('loginError', 'No account exists with this email');
             res.redirect('/auth/login#login');
@@ -195,7 +202,7 @@ router.post('/register', async (req, res) => {
         const addResult = await addUser(email, password, firstname, lastname, personal_number);
 
         if(addResult.modified == 0){
-            return res.status(201).json(JSON.stringify(addResult));
+            return res.json(JSON.stringify(addResult));
         }
         
         crypto.randomBytes(16, async (err, buffer) => {
@@ -220,7 +227,7 @@ router.post('/register', async (req, res) => {
                 console.error(error);
             });
             
-            res.status(201).json('{"message": "Confirmation email has been sent"}');
+            res.send('{"status": 201, "message": "Confirmation email has been sent"}');
         });
     }
     catch (e) {
@@ -245,8 +252,8 @@ router.post('/password-reset', async (req, res) => {
             user.tokenExpiration = Date.now() + 86400 * 1000;
             await user.save();
             await mailing.send(resetMailing(user.email, user.name, token, req.headers['user-agent']));
-            
-            res.status(201).json('{"message": "Confirmation email has been sent"}');
+        
+            res.send('{"status": 201, "message": "Confirmation email has been sent"}');
         });
     }
     catch (e) {
@@ -284,22 +291,23 @@ async function addUser(email, pass, firstname, lastname, personal_number){
 
     if(result != null){
         return {
-            error: 'Such email already exists in database, proceed to login or reset.',
+            status: 401,
+            message: 'Such email already exists in database, proceed to login or reset.',
             modified: 0
         };
     }
 
-    const hashed = await bcrypt.hash(pass, Math.floor(Math.random() * 3) + 10);
     await new User({
         email, 
-        password: hashed, 
+        password: pass, 
         firstname,
         lastname,
         personal_number
     }).save();
 
     return {
-        error: '',
+        status: 201,
+        message: '',
         modified: 1
     };
 }
@@ -309,7 +317,8 @@ async function removeUser(email){
     const user = await User.findOne({ email });
     if(user == null){
         return {
-            error: 'No user exists with this email.',
+            status: 401,
+            message: 'No user exists with this email.',
             modified: 0
         };
     }
@@ -317,7 +326,8 @@ async function removeUser(email){
     await User.deleteOne({ email });
 
     return {
-        error: '',
+        status: 201,
+        message: '',
         modified: 1
     };
 }
@@ -325,7 +335,8 @@ async function removeUser(email){
 async function changePassword(email, oldpass, newpass){
     if(oldpass === newpass){
         return {
-            error: 'Passwords cannot be same.',
+            status: 401,
+            message: 'Passwords cannot be same.',
             modified: 0
         };
     }
@@ -333,13 +344,15 @@ async function changePassword(email, oldpass, newpass){
     const user = await User.findOne({ email });
     if(user == null){
         return {
-            error: 'No user exists with this email.',
+            status: 401,
+            message: 'No user exists with this email.',
             modified: 0
         };
     }
     else if(!await bcrypt.compare(password, user.password)){
         return {
-            error: 'Passwords do not match.',
+            status: 401,
+            message: 'Passwords do not match.',
             modified: 0
         };
     }
@@ -350,7 +363,8 @@ async function changePassword(email, oldpass, newpass){
     await user.save();
 
     return {
-        error: '',
+        status: 201,
+        message: '',
         modified: 1
     };
 }
