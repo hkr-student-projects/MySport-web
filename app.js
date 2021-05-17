@@ -13,6 +13,7 @@ const MongoStore = require('connect-mongodb-session')(session);
 const homeRoute = require('./routes/home');
 const authRoute = require('./routes/auth');
 const sportsRoute = require('./routes/sports');
+const postsRoute = require('./routes/posts');
 const errorMiddleware = require('./middleware/error');
 const config = require('./keys/config');
 
@@ -61,10 +62,11 @@ app.use(express.json());
 
 app.use('/auth', authRoute);
 app.use('/sports', sportsRoute);
+app.use('/posts', postsRoute);
 app.use('/', homeRoute);
 app.use(errorMiddleware);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3002;
 // const client = new MongoClient(uri, { useNewUrlParser: true });
 // client.connect(err => {
 //   const collection = client.db("test").collection("devices");
