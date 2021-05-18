@@ -14,6 +14,7 @@ const homeRoute = require('./routes/home');
 const authRoute = require('./routes/auth');
 const sportsRoute = require('./routes/sports');
 const postsRoute = require('./routes/posts');
+const msgRoute = require('./routes/messaging');
 const errorMiddleware = require('./middleware/error');
 const config = require('./keys/config');
 
@@ -63,6 +64,7 @@ app.use(express.json());
 app.use('/auth', authRoute);
 app.use('/sports', sportsRoute);
 app.use('/posts', postsRoute);
+app.use('/messaging', msgRoute);
 app.use('/', homeRoute);
 app.use(errorMiddleware);
 
