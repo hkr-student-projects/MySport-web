@@ -23,7 +23,7 @@
     "express-session": "^1.17.1",
     "express-validator": "^6.10.0",
     "helmet": "^4.4.1",
-    "moment-timezone": "^0.5.33",
+    "moment-timezone": "^0.5.35",
     "mongoose": "^5.12.1",
     "request": "^2.88.2",
     "uuid": "^8.3.2"
